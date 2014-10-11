@@ -1,0 +1,11 @@
+Werkzeug==0.9.6
+argparse==1.2.1
+backports.ssl-match-hostname==3.4.0.2
+docker-py==0.5.0
+ipdb==0.8
+ipython==2.2.0
+redis==2.10.3
+requests==2.4.1
+six==1.8.0
+websocket-client==0.18.0
+wsgiref==0.1.2
