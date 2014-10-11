@@ -1,6 +1,7 @@
 {
     "server": {
-        "accessLog": "/var/log/nginx/access.log",
+        "accessLog": "/tmp/access.log",
+        "port": 80,
         "workers": 10,
         "maxSockets": 100,
         "deadBackendTTL": 30,
@@ -9,9 +10,5 @@
         "deadBackendOn500": true,
         "httpKeepAlive": false
     },
-    "http": {
-        "port": 80,
-        "bind": "127.0.0.1"
-    },
-    "driver": "redis://127.0.0.1:6379"
+    "driver": ["redis://127.0.0.1:6379"]
 }

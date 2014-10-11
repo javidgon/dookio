@@ -56,7 +56,7 @@ def application(request):
             address))
     else:
         return Response(
-        'Something went wrong! Please check your Dockerfile.')
+        'Something went wrong! Please check your Dockerfile. \n')
 
 if __name__ == '__main__':
     from werkzeug.serving import run_simple

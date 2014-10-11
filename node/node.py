@@ -7,9 +7,10 @@ from werkzeug.wrappers import Request, Response
 from paramiko import SSHClient, AutoAddPolicy
 from scp import SCPClient
 
-PROXY_MACHINE = os.environ['DOOKIO_PROXY_ADDRESS']
-PROXY_USERNAME = os.environ['DOOKIO_PROXY_USER']
-PROXY_ROOT_DIRECTORY = os.environ['DOOKIO_PROXY_ROOT']
+SERVER_MACHINE_ADDRESS = os.environ['DOOKIO_SERVER_ADDRESS']
+SERVER_USERNAME = os.environ['DOOKIO_SERVER_USER']
+SERVER_USERNAME_PASSWORD = os.environ['DOOKIO_SERVER_USER_PASSWORD']
+SERVER_ROOT_DIRECTORY = os.environ['DOOKIO_SERVER_ROOT']
 LOCAL_ROOT_DIRECTORY = os.environ['DOOKIO_NODE_ROOT'] 
 STARTING_PORT = 4567
 ENDING_PORT = 4700
@@ -37,7 +38,7 @@ def get_port():
 def application(request):
     """
     Creates and configures a docker image/container for a certain Dockerfile.
-    This Dockerfile is fetched from a remote machine (a.k.a PROXY), properly configured with
+    This Dockerfile is fetched from a remote machine (a.k.a SERVER), properly configured with
     the "gitreceive" library. Please notice that the code path in that remote
     machine has to match with the pattern defined in the env vars.
     """
@@ -48,7 +49,7 @@ def application(request):
 
     # Set paths
     local_path = '{}/{}/{}'.format(LOCAL_ROOT_DIRECTORY, user, repo)
-    remote_path = '{}/{}/{}'.format(PROXY_ROOT_DIRECTORY, user, repo)
+    remote_path = '{}/{}/{}'.format(SERVER_ROOT_DIRECTORY, user, repo)
     if not os.path.exists(local_path):
         os.makedirs(local_path)
 
@@ -56,9 +57,9 @@ def application(request):
     ssh = SSHClient()
     ssh.load_system_host_keys()
     ssh.set_missing_host_key_policy(AutoAddPolicy())
-    ssh.connect(PROXY_MACHINE, username=PROXY_USERNAME)
+    ssh.connect(SERVER_MACHINE_ADDRESS, username=SERVER_USERNAME, password=SERVER_USERNAME_PASSWORD)
     scp = SCPClient(ssh.get_transport())
-    # Fetch code from proxy
+    # Fetch code from server
     scp.get('{}/code.tar.gz'.format(remote_path), local_path)
     # Extract files
     with tarfile.open("{}/code.tar.gz".format(local_path), 'r:gz') as f:
@@ -68,18 +69,26 @@ def application(request):
                         version='1.12',
                         timeout=10)
     # Build docker image
-    image = cli.build(path=local_path, tag=tag)
-    for instruction in image:
-	print instruction
+    try:
+        image = cli.build(path=local_path, tag=tag)
+        for instruction in image:
+            print instruction
+    except:
+	cli.remove_image(image)
     # Create container (at this point only the port 80 will be open)
-    container = cli.create_container(image=tag, command="", ports=[80])
-    # Start container
-    port = get_port()
-    # Register new port into file
-    result = cli.start(container=container.get('Id'), port_bindings={80: port})
-    return Response(
-        json.dumps({'id': container.get('Id'),
-                    'port': '{}'.format(port)}))
+    try:
+        container = cli.create_container(image=tag, command="", ports=[80])
+        # Start container
+        port = get_port()
+        # Register new port into file
+        result = cli.start(container=container.get('Id'), port_bindings={80: port})
+    except:
+        cli.remove_container(container, v=False, link=False)
+    else:
+        return Response(
+	    json.dumps({'id': container.get('Id'),
+                        'port': '{}'.format(port)}))
+    return Response(status="500")
 
 if __name__ == '__main__':
     from werkzeug.serving import run_simple

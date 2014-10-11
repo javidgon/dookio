@@ -2,7 +2,7 @@
 # The domain that you want to use for connecting to your apps.
 # e.g http://blabla.com
 # In the end, your urls will look like e.g. http://app1.blabla.com
-export DOOKIO_DOMAIN=""
+DOOKIO_DOMAIN="0.0.0.0"
 
 URL="http://$DOOKIO_DOMAIN:8000"
 echo "----> Connecting with $URL"
@@ -13,7 +13,7 @@ cd /home/$3/$1/code && tar -zcvf ../code.tar.gz *
 echo "----> Deploying app..."
 echo "----> Processing information..."
 echo "----> Setting up webserver rules..."
-echo "----> Building docker container..."
+echo "----> Building docker container... (It might take a few minutes)"
 curl \
   -G \
   -d "repo=$1&user=$3" \
