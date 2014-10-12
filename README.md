@@ -83,7 +83,7 @@ supervisord-apache2.conf
 ----> Processing information...
 ----> Setting up webserver rules...
 ----> Building docker container... (It might take a few minutes)
-App successfully deployed! Go to http://apache.blabla.com
+App successfully deployed! Go to http://apache.git.blabla.com
 To git@blabla.com:apache
  + 61c180a...8c30e92 master -> master
 ```

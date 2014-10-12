@@ -8,11 +8,13 @@ from werkzeug.wrappers import Request, Response
 
 DOMAIN = os.environ['DOOKIO_DOMAIN']
 
-
-def pick_up_node():
+def get_nodes():
     with open('NODES') as f:
         nodes = [line.rstrip() for line in f]
+    return nodes
 
+def pick_up_node():
+    nodes = get_nodes()
     idx = random.randint(0, len(nodes) - 1)
     return nodes[idx]
 
@@ -35,6 +37,8 @@ def application(request):
     (user & repo params).
     """
     redis_cli = redis.StrictRedis(host='localhost', port=6379, db=0)
+    user = request.args.get('user')
+    repo = request.args.get('repo')
 
     # Dookio-cli: apps command
     if request.path == '/apps':
@@ -44,16 +48,19 @@ def application(request):
                 app[app.find(":") + 1:], len(apps[app]))) for app in apps])
 
     # Dookio-cli: containers command
-    if request.path == '/containers':
-        apps = fetch_apps(redis_cli)
-        return Response(
-            [('--> {} - Containers: {}\n'.format(
-                app[app.find(":") + 1:], apps[app])) for app in apps])
+    elif request.path == '/containers':
+        nodes = {}
+        for node in get_nodes():
+             response = requests.get('{}:5000/containers?user={}&repo={}'.format(node, user, repo))
+             nodes[node] = json.loads(response.content)
+	resp = [{
+	    'node': node,
+            'containers': [container.get('Id') for container in containers]
+	} for node, containers in nodes.iteritems()]
+        return Response(json.dumps(resp))
 
     # Pick up the proper params
-    user = request.args.get('user')
-    repo = request.args.get('repo')
-    address = '{}.{}'.format(repo, DOMAIN)
+    address = '{}.{}.{}'.format(repo, user, DOMAIN)
 
     if not all([user, repo]):
         return Response(

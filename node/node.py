@@ -42,10 +42,23 @@ def application(request):
     the "gitreceive" library. Please notice that the code path in that remote
     machine has to match with the pattern defined in the env vars.
     """
+    # Create docker socket
+    cli = docker.Client(base_url='unix://var/run/docker.sock',
+                        version='1.12',
+                        timeout=10)
+
     # Fetch get params
     user = request.args.get('user')
     repo = request.args.get('repo')
     tag = "{}/{}".format(user, repo)
+
+    # Get list of containers.
+    if request.path == '/containers':
+        containers = []
+        for cont in cli.containers():
+	    if '{}_{}'.format(user, repo) in cont.get('Names')[0]:
+                containers.append(cont)
+	return Response(json.dumps(containers))
 
     # Set paths
     local_path = '{}/{}/{}'.format(LOCAL_ROOT_DIRECTORY, user, repo)
@@ -64,31 +77,23 @@ def application(request):
     # Extract files
     with tarfile.open("{}/code.tar.gz".format(local_path), 'r:gz') as f:
         f.extractall('{}'.format(local_path))
-    # Create docker socket
-    cli = docker.Client(base_url='unix://var/run/docker.sock',
-                        version='1.12',
-                        timeout=10)
     # Build docker image
-    try:
-        image = cli.build(path=local_path, tag=tag)
-        for instruction in image:
-            print instruction
-    except:
-	cli.remove_image(image)
+    image = cli.build(path=local_path, tag=tag)
+    for instruction in image:
+        print instruction
+
+    # Start container
+    port = get_port()
     # Create container (at this point only the port 80 will be open)
-    try:
-        container = cli.create_container(image=tag, command="", ports=[80])
-        # Start container
-        port = get_port()
-        # Register new port into file
-        result = cli.start(container=container.get('Id'), port_bindings={80: port})
-    except:
-        cli.remove_container(container, v=False, link=False)
-    else:
-        return Response(
-	    json.dumps({'id': container.get('Id'),
-                        'port': '{}'.format(port)}))
-    return Response(status="500")
+    container = cli.create_container(name="{}_{}_{}".format(user, repo, port),
+                                     image=tag,
+                                     command="",
+                                     ports=[80])
+    # Register new port into file
+    result = cli.start(container=container.get('Id'), port_bindings={80: port})
+    return Response(
+        json.dumps({'id': container.get('Id'),
+                    'port': '{}'.format(port)}))
 
 if __name__ == '__main__':
     from werkzeug.serving import run_simple

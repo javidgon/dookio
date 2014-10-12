@@ -1,10 +1,6 @@
 #!/bin/bash
-# The domain that you want to use for connecting to your apps.
-# e.g http://blabla.com
-# In the end, your urls will look like e.g. http://app1.blabla.com
-DOOKIO_DOMAIN="0.0.0.0"
 
-URL="http://$DOOKIO_DOMAIN:8000"
+URL="http://0.0.0.0:8000"
 echo "----> Connecting with $URL"
 echo "----> Creating/updating the path $3/$1"
 mkdir -p /home/$3/$1/code && cat | tar -x -C /home/$3/$1/code

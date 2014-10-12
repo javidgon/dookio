@@ -14,9 +14,10 @@ sudo npm install hipache -g
 sudo cp server/hipache/upstart.conf /etc/init/hipache.conf
 sudo cp server/hipache/config.json /etc/hipache.json
 echo "------> 3) Installing/Setting up Docker..."
-sudo apt-get install -y docker.io
-sudo ln -sf /usr/bin/docker.io /usr/local/bin/docker
-sudo sed -i '$acomplete -F _docker docker' /etc/bash_completion.d/docker.io
+wget -qO- https://get.docker.io/gpg | sudo apt-key add -
+sudo sh -c "echo deb http://get.docker.io/ubuntu docker main > /etc/apt/sources.list.d/docker.list"
+sudo apt-get update
+sudo apt-get install lxc-docker
 echo "------> 4) Installing 'Server' requirements"
 sudo apt-get install -y python-dev python-setuptools
 easy_install pip
