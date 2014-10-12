@@ -16,6 +16,11 @@ def pick_up_node():
     idx = random.randint(0, len(nodes) - 1)
     return nodes[idx]
 
+def fetch_apps(redis_cli):
+    apps = {}
+    for app in redis_cli.scan_iter():
+        apps[app] = redis_cli.lrange(app, 1, -1)
+    return apps
 
 @Request.application
 def application(request):
@@ -29,6 +34,22 @@ def application(request):
     and provides him with the required information for a success deployment
     (user & repo params).
     """
+    redis_cli = redis.StrictRedis(host='localhost', port=6379, db=0)
+
+    # Dookio-cli: apps command
+    if request.path == '/apps':
+        apps = fetch_apps(redis_cli)
+        return Response(
+            [('--> {} (replicated in {} containers)\n'.format(
+                app[app.find(":") + 1:], len(apps[app]))) for app in apps])
+
+    # Dookio-cli: containers command
+    if request.path == '/containers':
+        apps = fetch_apps(redis_cli)
+        return Response(
+            [('--> {} - Containers: {}\n'.format(
+                app[app.find(":") + 1:], apps[app])) for app in apps])
+
     # Pick up the proper params
     user = request.args.get('user')
     repo = request.args.get('repo')
@@ -38,7 +59,6 @@ def application(request):
         return Response(
             'There was a problem. Please be sure you are providing both "user", "repo"\n')
 
-    r = redis.StrictRedis(host='localhost', port=6379, db=0)
     # Set up docker container
     node = pick_up_node()
     response = requests.get('{}:5000'.format(node),
@@ -48,8 +68,9 @@ def application(request):
         # Set up hipache webserver for the specified branch
         container_info = json.loads(response.content)
         repo_key = 'frontend:{}'.format(address)
-        r.rpush(repo_key, repo)
-        r.rpush(repo_key, '{}:{}'.format(node, container_info.get('port')))
+        if not redis_cli.lrange(repo_key, 0, -1):
+            redis_cli.rpush(repo_key, repo)
+        redis_cli.rpush(repo_key, '{}:{}'.format(node, container_info.get('port')))
 
         return Response(
         'App successfully deployed! Go to http://{}\n'.format(
