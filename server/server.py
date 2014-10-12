@@ -52,7 +52,7 @@ def application(request):
         r.rpush(repo_key, '{}:{}'.format(node, container_info.get('port')))
 
         return Response(
-        'App successfully deployed! You can now see it in http://{}!\n'.format(
+        'App successfully deployed! Go to http://{}\n'.format(
             address))
     else:
         return Response(

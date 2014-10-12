@@ -11,8 +11,11 @@ The Stack consists in:
 * Two WSGI applications (server.py and node.py) (run by [Werkzeug] (http://werkzeug.pocoo.org/))
 * [Docker] (https://www.docker.com/)
 
-## Installation (Linux - Ubuntu)
-The installation is automatized for "single node deployments" (this means that both the server and node are the same machine), but it should be straightforward to use a more complex set up.
+## 1. Quick Start
+
+### 1.1 Single node installation (Linux - Ubuntu)
+
+The quick start is automatized for "single node deployments" (this means that both the server, the app that receives your push, and the node, the app that creates your container, are the same machine). For more a more complex set up (multiple nodes spread in several machines), just go to the [next section] (https://github.com/javidgon/dookio#2-multiple-nodes-set-up).
 
 The installation assumes that you are deploying it over a clean machine. If this is not the case, I'd recommend you to change the configuration. Also, the program sets some environment vars that can be modified if needed.
 
@@ -33,7 +36,7 @@ DOOKIO_SERVER_USER_PASSWORD="<linux_password>"
 export DOOKIO_DOMAIN="blabla.com"
 ```
 
-Of course, in order to work, your domain "blabla.com" needs to point to the machine you are setting up.
+**Important**: In order to work, your domain "blabla.com" needs to point to the machine you are setting up, please have a look at the following link if you don't know how: [link](https://gist.github.com/ngoldman/7287753#3-configure-dns)
 
 Well, after setting up the aforementioned environment vars, you just need to run the following scripts:
 
@@ -49,7 +52,7 @@ Well, after setting up the aforementioned environment vars, you just need to run
 ./single_node_run_linux.sh
 ```
 
-## Use
+### 1.2 General Use
 As stated [here] (https://github.com/progrium/gitreceive#create-a-user-by-uploading-a-public-key-from-your-laptop), before the first use you need to run the following command in your laptop:
 
 ```python
@@ -80,16 +83,38 @@ supervisord-apache2.conf
 ----> Processing information...
 ----> Setting up webserver rules...
 ----> Building docker container... (It might take a few minutes)
-App successfully deployed! You can now see it in http://apache.blabla.com!
+App successfully deployed! Go to http://apache.blabla.com
 To git@blabla.com:apache
  + 61c180a...8c30e92 master -> master
 ```
 
-## Installation (Another OS)
-Just install the different components one by one. Dookio has not a particular contraint regarding the OS, but it's possible that some libraries have. Just play around! 
+## 2. "Multiple nodes" Set up
+If you need to deploy many applications (or create a HA application) you probably want to have several nodes working for you. With `Dookio` this is straightforward.
+First, modify the `NODES` file to include the IP Adresses of your nodes: E.g
 
-## Contribute
+````python
+http://123.123.123.1
+http://123.123.123.2
+http://123.123.123.3
+```
+
+Second, in each node, follow the next steps:
+
+* Install with `pip` the `node/requirements.txt` file (`pip install -r node/requirements.txt`)
+* Export the `env vars` defined in the `node/env.sh` file (`source node/env.sh`)
+* Run the `node/node.py` file (`python node/node.py`)
+
+## 3. Contribute
 Simply create a PR. Easy :)
 
-## Big thanks
-Dotcloud (creators of Hipache and Docker), Redis community and Jeff Lindsay (the creator of Gitreceive).
+## 4. TODO
+* Be able to scale up easily by using a `PROCFILE` with the number of workers
+* Be able to publish more ports in the containers (currently only the port 8000 is published in the container)
+* Create `dookio` command for listing, removing existing applications. e.g `dookio list`, `dookio remove apache`
+* Adapt `single_node_bootstrap.sh` to different platforms (MacOSX, ...)
+
+## 5. Big thanks
+[dotCloud] (https://www.dotcloud.com/) (creators of Hipache and Docker), [Redis community] (http://redis.io/) and [Jeff Lindsay] (http://progrium.com/blog/) (the creator of Gitreceive).
+
+## 6. License
+MIT
