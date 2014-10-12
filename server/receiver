@@ -10,7 +10,13 @@ echo "----> Deploying app..."
 echo "----> Processing information..."
 echo "----> Setting up webserver rules..."
 echo "----> Building docker container... (It might take a few minutes)"
-curl \
-  -G \
-  -d "repo=$1&user=$3" \
-  --silent $URL
+
+OUTPUT=$(curl -G -d "repo=$1&user=$3" --silent $URL)
+
+echo ${OUTPUT}
+if [[ ${OUTPUT} == *success* ]]
+then
+  printf "\nDone.\n";
+else
+  exit 1
+fi
