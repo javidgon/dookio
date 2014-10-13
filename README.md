@@ -1,8 +1,11 @@
-Dookio: Heroku-ish deployment of Docker containers
-==================================================
+Dookio: Your own PasS with Heroku-ish deployment of Docker containers
+=====================================================================
 
-As the description says, `Dookio` is a simple tool that allows you to deploy Docker containers
-by pushing to a remote server.
+As the description says, `Dookio` is a simple tool that allows you to deploy your own apps
+by pushing to a remote server. The only requirement is to define a `Dockerfile` at the root level
+with the building instructions.
+
+> For scaling, listing and stopping app's containers, please have a look at [Dookio-cli](https://github.com/javidgon/dookio-cli)
 
 The Stack consists in:
 * [Hipache] (https://github.com/hipache/hipache)
@@ -108,9 +111,7 @@ Second, in each node, follow the next steps:
 Simply create a PR. Easy :)
 
 ## 4. TODO
-* Be able to scale up easily by using a `PROCFILE` with the number of workers
 * Be able to publish more ports in the containers (currently only the port 8000 is published in the container)
-* Create `dookio` command for listing, removing existing applications. e.g `dookio list`, `dookio remove apache`
 * Adapt `single_node_bootstrap.sh` to different platforms (MacOSX, ...)
 
 ## 5. Big thanks
