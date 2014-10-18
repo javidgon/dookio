@@ -11,28 +11,43 @@ SERVER_MACHINE_ADDRESS = os.environ['DOOKIO_SERVER_ADDRESS']
 SERVER_USERNAME = os.environ['DOOKIO_SERVER_USER']
 SERVER_USERNAME_PASSWORD = os.environ['DOOKIO_SERVER_USER_PASSWORD']
 SERVER_ROOT_DIRECTORY = os.environ['DOOKIO_SERVER_ROOT']
-LOCAL_ROOT_DIRECTORY = os.environ['DOOKIO_NODE_ROOT'] 
+LOCAL_ROOT_DIRECTORY = os.environ['DOOKIO_NODE_ROOT']
 STARTING_PORT = 4567
 ENDING_PORT = 4700
 
+
+def read_used_ports():
+    lines = []
+    if os.path.exists("USED_PORTS"):
+        with open('USED_PORTS') as f:
+            lines = [line for line in f]
+            used_ports = [int(line.rstrip()) for line in lines]
+    else:
+        f = open('USED_PORTS', 'w')
+        f.close()
+        used_ports = []
+    return used_ports, lines
 
 def get_port():
     """
     Assings a 'non-used' port.
     """
-    if os.path.exists("USED_PORTS"):
-        with open('USED_PORTS') as f:
-            used_ports = [int(line.rstrip()) for line in f]
-    else:
-        open('USED_PORTS', 'w')
-        used_ports = []
- 
+    used_ports, _ = read_used_ports()
     for port in range(STARTING_PORT, ENDING_PORT):
         if port not in used_ports:
             with open('USED_PORTS', 'a') as f:
-    	        f.write('{}\n'.format(port))
-	    return int(port)
+                f.write('{}\n'.format(port))
+            return int(port)
     raise Exception('There are no more available ports!')
+
+def make_port_available(port):
+    used_ports, lines = read_used_ports()
+    f = open('AUX_USED_PORTS', 'w')
+    for line in lines:
+        if port != int(line.rstrip()):
+            f.write(line)
+    f.close()
+    os.rename('AUX_USED_PORTS', 'USED_PORTS')
 
 @Request.application
 def application(request):
@@ -48,25 +63,45 @@ def application(request):
                         timeout=10)
 
     # Fetch get params
+    action = request.args.get('action')
     user = request.args.get('user')
     repo = request.args.get('repo')
     tag = "{}/{}".format(user, repo)
 
-    # Get list of containers.
-    if request.path == '/containers':
-        containers = []
-        for cont in cli.containers():
-	    if '{}_{}'.format(user, repo) in cont.get('Names')[0]:
-                containers.append(cont)
-	return Response(json.dumps(containers))
-
     # Set paths
     local_path = '{}/{}/{}'.format(LOCAL_ROOT_DIRECTORY, user, repo)
     remote_path = '{}/{}/{}'.format(SERVER_ROOT_DIRECTORY, user, repo)
+
+    # Get list of containers.
+    if request.path == '/containers':
+        containers = []
+        if action == 'get':
+            for cont in cli.containers():
+		name = cont.get('Names')[0]
+                if '{}_{}'.format(user, repo) == name[1:len(name) - 5]:
+                    containers.append(cont)
+        elif action == 'stop':
+            for cont in cli.containers():
+		name = cont.get('Names')[0]
+                if '{}_{}'.format(user, repo) == name[1:len(name) - 5]:
+                    ports = cont.get('Ports')
+                    for port in ports:
+                        make_port_available(port.get('PublicPort'))
+                    cli.kill(cont)
+                    cli.remove_container(cont.get('Id'), force=True)
+                    for image in cli.images():
+                        if '{}/{}'.format(user, repo) in image.get('RepoTags')[0]:
+                            try:
+                                cli.remove_image(image.get('Id'), force=True)
+                            except:
+                                pass
+
+        return Response(json.dumps(containers))
+
     if not os.path.exists(local_path):
         os.makedirs(local_path)
 
-    # Establish ssh connection 
+    # Establish ssh connection
     ssh = SSHClient()
     ssh.load_system_host_keys()
     ssh.set_missing_host_key_policy(AutoAddPolicy())
