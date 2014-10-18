@@ -112,6 +112,7 @@ def application(request):
     # Extract files
     with tarfile.open("{}/code.tar.gz".format(local_path), 'r:gz') as f:
         f.extractall('{}'.format(local_path))
+
     # Build docker image
     image = cli.build(path=local_path, tag=tag)
     for instruction in image:

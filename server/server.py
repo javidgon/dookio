@@ -111,13 +111,16 @@ def application(request):
                 if not redis_cli.lrange(repo_key, 0, -1):
                     redis_cli.rpush(repo_key, repo)
                 redis_cli.rpush(repo_key, '{}:{}'.format(node, container_info.get('port')))
+            else:
+                return Response(
+                'Something went wrong! Please check your Dockerfile. \n')
 
         return Response(
             'App successfully deployed! Go to http://{}\n'.format(
                address))
     else:
         return Response(
-        'Something went wrong! Please check your Dockerfile. \n')
+        'Something went wrong! Are you using the proper parameters?. \n')
 
 if __name__ == '__main__':
     from werkzeug.serving import run_simple

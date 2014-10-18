@@ -8,3 +8,9 @@ docker stop $(docker ps -a -q)
 
 # Remove all the containers.
 docker rm $(docker ps -a -q)
+
+# Remove untagged images.
+docker rmi $(docker images -q --filter "dangling=true")
+
+# Kill node and server.
+sudo pkill python
