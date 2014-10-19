@@ -8,6 +8,7 @@ from werkzeug.wrappers import Request, Response
 
 DOMAIN = os.environ['DOOKIO_DOMAIN']
 
+
 def get_nodes():
     """
     Get all the available nodes.
@@ -16,6 +17,7 @@ def get_nodes():
         nodes = [line.rstrip() for line in f]
     return nodes
 
+
 def pick_up_node():
     """
     Pick a random node.
@@ -23,6 +25,7 @@ def pick_up_node():
     nodes = get_nodes()
     idx = random.randint(0, len(nodes) - 1)
     return nodes[idx]
+
 
 def fetch_apps(redis_cli):
     """
@@ -33,17 +36,71 @@ def fetch_apps(redis_cli):
         apps[app] = redis_cli.lrange(app, 1, -1)
     return apps
 
-def contact_containers(action, user, repo):
+
+def contact_nodes(conf):
     """
-    Contact with the different comtainers.
+    Contact all nodes in order to do apply actions.
     """
+    user = conf.get('user')
+    repo = conf.get('repo')
+    action = conf.get('action')
+
     nodes = {}
     for node in get_nodes():
-        response = requests.get(
-            '{}:5000/containers?action={}&user={}&repo={}'.format(
-                node, action, user, repo))
-        nodes[node] = json.loads(response.content)
+        response = contact_containers(action, node, user, repo)
+        if response.status_code == 200:
+            clean_content = json.loads(response.content)
+            nodes[node] = (clean_content, 200)
+        else:
+            nodes[node] = (response.content, response.status_code)
     return nodes
+
+
+def contact_containers(action, node, user, repo):
+    """
+    Contact with the different containers spread in a certain node.
+    """
+    response = requests.get(
+        '{}:5000/containers?action={}&user={}&repo={}'.format(
+            node, action, user, repo))
+    return response
+
+
+def add_app_to_webserver_routing(redis_cli, conf):
+    repo = conf.get('repo')
+    application_address = conf.get('application_address')
+    webserver_application_name = 'frontend:{}'.format(application_address)
+    redis_cli.rpush(webserver_application_name, repo)
+
+
+def remove_app_from_webserver_routing(redis_cli, conf):
+    application_address = conf.get('application_address')
+    redis_cli.delete('frontend:{}'.format(application_address))
+
+
+def exist_application(redis_cli, conf):
+    application_address = conf.get('application_address')
+    webserver_application_name = 'frontend:{}'.format(application_address)
+    return bool(redis_cli.lrange(webserver_application_name, 0, -1))
+
+
+def add_container_to_webserver_routing(redis_cli, node, port, conf):
+    application_address = conf.get('application_address')
+    webserver_application_name = 'frontend:{}'.format(
+        application_address)
+    redis_cli.rpush(webserver_application_name, '{}:{}'.format(node, port))
+
+
+def was_applied(response_nodes):
+    """
+    Was applied in at least one node?
+    """
+    for node_ip, response in response_nodes.iteritems():
+        body = response[0]
+        status_code = response[1]
+        if status_code == 200:
+            return True
+    return False
 
 
 @Request.application
@@ -68,59 +125,83 @@ def application(request):
                 app[app.find(":") + 1:], len(apps[app]))) for app in apps])
 
     # Pick up the proper params
-    action = request.args.get('action')
-    multiplicator = int(request.args.get('multiplicator', 1))
-    user = request.args.get('user')
-    repo = request.args.get('repo')
-    address = '{}.{}.{}'.format(repo, user, DOMAIN)
-    repo_key = 'frontend:{}'.format(address)
+    conf = {
+        'action': request.args.get('action'),
+        'multiplicator': int(request.args.get('multiplicator', 1)),
+        'user': request.args.get('user'),
+        'repo': request.args.get('repo'),
+        'application_address': '{}.{}.{}'.format(
+            request.args.get('repo'), request.args.get('user'), DOMAIN)
+    }
 
-    if not all([user, repo]):
+    if not all([conf.get('user'), conf.get('repo')]):
         return Response(
-            'There was a problem. Please be sure you are providing both "user", "repo"\n')
+            'There was a problem. Please be sure you are '
+            'providing both "user", "repo"\n')
 
     # Dookio-cli: containers command
+    action = conf.get('action')
     if request.path == '/containers':
-        nodes = contact_containers(action, user, repo)
-	resp = [{
-            'node': node,
-            'containers': [container.get('Id') for container in containers]
-	} for node, containers in nodes.iteritems()]
+        response_nodes = contact_nodes(conf)
         if action == 'stop':
-            redis_cli.delete('frontend:{}'.format(address))
-
+            if was_applied(response_nodes):
+                remove_app_from_webserver_routing(redis_cli, conf)
+        elif action == 'start':
+            if (was_applied(response_nodes) and
+                    not exist_application(redis_cli, conf)):
+                add_app_to_webserver_routing(redis_cli, conf)
+            for node_ip, response in response_nodes.iteritems():
+                # We only want to iterate over the valid responses.
+                status_code = response[1]
+                body = response[0][0]
+                if status_code == 200:
+                    port = body.get('Ports')[0].get('PublicPort')
+                    add_container_to_webserver_routing(redis_cli,
+                                                       node_ip,
+                                                       port,
+                                                       conf)
+        resp = [{
+            'node': node_ip,
+            'containers': content[0]
+        } for node_ip, content in response_nodes.iteritems()]
         return Response(json.dumps(resp))
 
     # Dookio-cli: scale command
     if request.path == '/scale':
-        if not redis_cli.lrange(repo_key, 0, -1):
+        if not exist_application(redis_cli, conf):
             return Response(
                 'The app can not scale unless is running!\n')
+
     if request.path == '/scale' or request.path == '/':
+        user = conf.get('user')
+        repo = conf.get('repo')
         # Stop all existing containers
-        nodes = contact_containers('stop', user, repo)
-        redis_cli.delete('frontend:{}'.format(address))
-        for i in range(multiplicator):
+        conf['action'] = 'stop'
+        contact_nodes(conf)
+        remove_app_from_webserver_routing(redis_cli, conf)
+        for i in range(conf.get('multiplicator')):
             node = pick_up_node()
             response = requests.get('{}:5000'.format(node),
                                     params={'user': user, 'repo': repo})
 
             if response.status_code == 200:
                 # Set up hipache webserver for the specified branch
-                container_info = json.loads(response.content)
-                if not redis_cli.lrange(repo_key, 0, -1):
-                    redis_cli.rpush(repo_key, repo)
-                redis_cli.rpush(repo_key, '{}:{}'.format(node, container_info.get('port')))
+                container = json.loads(response.content)
+                if not exist_application(redis_cli, conf):
+                    add_app_to_webserver_routing(redis_cli, conf)
+                add_container_to_webserver_routing(redis_cli,
+                                                   node,
+                                                   container.get('Port'),
+                                                   conf)
             else:
-                return Response(
-                'Something went wrong! Please check your Dockerfile. \n')
+                return Response(response.content, status=response.status_code)
 
         return Response(
             'App successfully deployed! Go to http://{}\n'.format(
-               address))
+                conf.get('application_address')))
     else:
         return Response(
-        'Something went wrong! Are you using the proper parameters?. \n')
+            'Something went wrong! Are you using the proper parameters?. \n')
 
 if __name__ == '__main__':
     from werkzeug.serving import run_simple
