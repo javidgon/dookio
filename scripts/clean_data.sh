@@ -14,3 +14,6 @@ docker rmi $(docker images -q --filter "dangling=true")
 
 # Kill node and server.
 sudo pkill python
+
+# Remove used ports file.
+rm ../USED_PORTS
