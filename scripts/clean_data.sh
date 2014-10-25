@@ -16,4 +16,4 @@ docker rmi $(docker images -q --filter "dangling=true")
 sudo pkill python
 
 # Remove used ports file.
-rm ../USED_PORTS
+rm USED_PORTS

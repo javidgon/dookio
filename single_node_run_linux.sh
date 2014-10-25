@@ -7,7 +7,7 @@ echo "------> 2) Running Hipache webserver..."
 sudo start hipache
 echo "------> 3) Running Dookio server"
 source server/env.sh
-python server/server.py &
+python server/main.py &
 echo "------> 4) Running Dookio node"
 source node/env.sh
 python node/node.py &
