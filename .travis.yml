@@ -2,4 +2,4 @@ language: python
 python:
       - "2.7"
 install: pip install -r server/requirements.txt && pip install -r node/requirements.txt 
-script: nosetests -w server/src/tests/
+script: nosetests -w server && nosetests -w node
